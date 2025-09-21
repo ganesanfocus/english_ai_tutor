@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>English Speaking Practice with LM Studio</title>
+    <title>English Speaking Practice with AI</title>
     <style>
         * {
             margin: 0;
@@ -52,6 +52,8 @@
 
         .setup-section ol {
             margin-left: 20px;
+            color: #555;
+            list-style-type: decimal;
         }
 
         .setup-section li {
@@ -76,7 +78,7 @@
             background: #f8d7da;
             color: #721c24;
         }
-
+        
         .practice-section {
             margin-bottom: 30px;
         }
@@ -121,7 +123,7 @@
             gap: 8px;
         }
 
-        button:hover {
+        button:hover:not(:disabled) {
             background: #5a6fd8;
             transform: translateY(-2px);
         }
@@ -136,7 +138,7 @@
             background: #6c757d;
         }
 
-        .secondary-btn:hover {
+        .secondary-btn:hover:not(:disabled) {
             background: #5a6268;
         }
 
@@ -181,6 +183,7 @@
             border-radius: 8px;
             margin: 10px 0;
             border: 1px solid #ddd;
+            word-wrap: break-word;
         }
 
         .ai-feedback {
@@ -189,6 +192,7 @@
             border-radius: 8px;
             margin: 15px 0;
             border-left: 4px solid #4a90e2;
+            white-space: pre-wrap; /* Preserve formatting from the AI */
         }
 
         .status {
@@ -215,7 +219,7 @@
             color: #856404;
             border: 1px solid #ffeaa7;
         }
-
+        
         .audio-upload {
             background: #fff;
             border: 2px dashed #ddd;
@@ -237,20 +241,20 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎤 English Practice with LM Studio</h1>
+        <h1>🎤 English Practice with AI</h1>
         
         <div class="setup-section">
             <h3>🔧 Setup Instructions:</h3>
             <ol>
-                <li>Open LM Studio and load a model (recommended: Llama 3.2 3B Instruct)</li>
-                <li>Start the local server (usually runs on port 1234)</li>
-                <li>Flask backend is running on port 5000</li>
-                <li>Click "Test Connection" below</li>
+                <li>Open **LM Studio** and load a model (e.g., Llama 3.2 3B Instruct)</li>
+                <li>Start the **local server** in LM Studio (usually runs on port 1234)</li>
+                <li>Start your Flask backend server on port 5000</li>
+                <li>Click **"Test Connection"** below</li>
             </ol>
             
             <div class="connection-status disconnected" id="connectionStatus">
                 <span>🔴</span>
-                <span>LM Studio: Not Connected</span>
+                <span>AI Server: Not Connected</span>
                 <button onclick="testConnection()" class="secondary-btn">Test Connection</button>
             </div>
         </div>
@@ -258,26 +262,28 @@
         <div class="practice-section">
             <div class="practice-prompt">
                 <h3>Practice Prompt:</h3>
-                <p id="promptText">Tell me about your favorite hobby and why you enjoy it. Try to speak for about 30-60 seconds.</p>
+                <p id="promptText">Tell me about your favorite hobby and why you enjoy it.</p>
                 <button onclick="getNewPrompt()">Get New Prompt</button>
             </div>
 
             <div class="controls">
                 <button id="startBtn" onclick="startRecording()">
-                    🎤 Record & Analyze
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mic"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                    Record & Analyze
                 </button>
                 <button id="stopBtn" onclick="stopRecording()" disabled>
-                    ⏹️ Stop Recording
-                </button>
-                <button id="liveBtn" onclick="startLiveSpeech()" class="secondary-btn">
-                    🗣️ Live Speech
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-square"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>
+                    Stop Recording
                 </button>
             </div>
-
+            
             <div class="audio-upload">
                 <p>Or upload an audio file:</p>
                 <input type="file" id="audioFile" accept="audio/*" onchange="handleFileUpload()">
-                <button onclick="document.getElementById('audioFile').click()">📁 Upload Audio</button>
+                <button onclick="document.getElementById('audioFile').click()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder-input"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h4"/><path d="M12 13v7"/><path d="m15 16-3-3-3 3"/></svg>
+                    Upload Audio
+                </button>
             </div>
 
             <div class="recording-indicator" id="recordingIndicator">
@@ -298,16 +304,18 @@
             </div>
 
             <div class="ai-feedback" id="aiFeedback">
-                <h4>🤖 AI Feedback from LM Studio:</h4>
+                <h4>🤖 AI Feedback:</h4>
                 <p id="feedbackText"></p>
             </div>
 
             <div class="controls">
                 <button onclick="speakFeedback()" id="speakBtn">
-                    🔊 Listen to Feedback
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-volume-2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                    Listen to Feedback
                 </button>
                 <button onclick="startNewPractice()" class="secondary-btn">
-                    🔄 New Practice
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-rotate-cw"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1.03 6.63 2.87"/><path d="M12 3v7h7"/></svg>
+                    New Practice
                 </button>
             </div>
         </div>
@@ -321,8 +329,6 @@
         let isRecording = false;
         let currentFeedback = "";
         let lmStudioConnected = false;
-        let speechRecognition = null;
-        let isLiveSpeech = false;
 
         const prompts = [
             "Tell me about your favorite hobby and why you enjoy it.",
@@ -341,22 +347,22 @@
             "What advice would you give to your younger self?"
         ];
 
+        // 1. Dynamic model detection for LM Studio
         async function testConnection() {
             try {
                 showStatus('Testing LM Studio connection...', 'warning');
                 
-                const response = await fetch('http://localhost:1234/v1/models', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-
+                const response = await fetch('/models'); // Use your Flask route
+                
                 if (response.ok) {
                     const data = await response.json();
+                    const modelName = data.data?.[0]?.id || 'Unknown model';
                     lmStudioConnected = true;
-                    updateConnectionStatus(true, data.data?.[0]?.id || 'Model loaded');
-                    showStatus('✅ LM Studio connected successfully!', 'success');
+                    updateConnectionStatus(true, modelName);
+                    showStatus(`✅ LM Studio connected with model: ${modelName}`, 'success');
+                    
+                    // Store the actual model name for use in AI requests
+                    window.currentModel = modelName;
                 } else {
                     throw new Error('Connection failed');
                 }
@@ -367,14 +373,15 @@
             }
         }
 
+
         function updateConnectionStatus(connected, modelName = '') {
             const status = document.getElementById('connectionStatus');
             if (connected) {
                 status.className = 'connection-status connected';
-                status.innerHTML = `<span>🟢</span><span>LM Studio: Connected ${modelName ? `(${modelName})` : ''}</span>`;
+                status.innerHTML = `<span>🟢</span><span>AI Server: Connected ${modelName ? `(${modelName})` : ''}</span>`;
             } else {
                 status.className = 'connection-status disconnected';
-                status.innerHTML = `<span>🔴</span><span>LM Studio: Not Connected</span><button onclick="testConnection()" class="secondary-btn">Test Connection</button>`;
+                status.innerHTML = `<span>🔴</span><span>AI Server: Not Connected</span><button onclick="testConnection()" class="secondary-btn">Test Connection</button>`;
             }
         }
 
@@ -382,6 +389,8 @@
             const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
             document.getElementById('promptText').textContent = randomPrompt;
             document.getElementById('feedbackSection').style.display = 'none';
+            document.getElementById('transcriptText').textContent = '';
+            document.getElementById('feedbackText').textContent = '';
         }
 
         async function startRecording() {
@@ -425,18 +434,41 @@
             }
         }
 
+        // 2. File validation before upload
         function handleFileUpload() {
             const fileInput = document.getElementById('audioFile');
             const file = fileInput.files[0];
+            
             if (file) {
+                // Validate file size (16MB limit)
+                if (file.size > 16 * 1024 * 1024) {
+                    showStatus('❌ File too large. Maximum size is 16MB.', 'error');
+                    fileInput.value = ''; // Clear the input
+                    return;
+                }
+                
+                // Validate file type
+                const allowedTypes = ['audio/mp3', 'audio/wav', 'audio/m4a', 'audio/ogg'];
+                if (!allowedTypes.includes(file.type) && !file.name.match(/\.(mp3|wav|m4a|ogg)$/i)) {
+                    showStatus('❌ Invalid file type. Please use MP3, WAV, M4A, or OGG.', 'error');
+                    fileInput.value = ''; // Clear the input
+                    return;
+                }
+                
                 showStatus('📁 Processing uploaded audio file...', 'warning');
                 processAudio(file);
+                
+                // Clear the file input after processing starts
+                setTimeout(() => {
+                    fileInput.value = '';
+                }, 1000);
             }
         }
 
+
         async function processAudio(audioBlob) {
             document.getElementById('processingIndicator').style.display = 'block';
-            showStatus('🔄 Step 1: Converting speech to text with Whisper...', 'warning');
+            showStatus('🔄 Step 1: Converting speech to text...', 'warning');
 
             try {
                 // Send to Flask backend for Whisper processing
@@ -467,6 +499,7 @@
         }
 
         // Send audio to Flask backend for Whisper transcription
+        // 4. Better error handling for audio processing
         async function transcribeWithWhisper(audioBlob) {
             try {
                 const formData = new FormData();
@@ -477,16 +510,19 @@
                     body: formData
                 });
 
-                if (!response.ok) {
-                    throw new Error(`Backend server error: ${response.status}`);
-                }
-
                 const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || `Server error: ${response.status}`);
+                }
                 
-                if (result.success) {
+                if (result.success && result.transcript) {
+                    if (result.transcript.trim().length < 10) {
+                        showStatus('⚠️ Very short transcript detected. Try speaking longer or closer to the microphone.', 'warning');
+                    }
                     return result.transcript;
                 } else {
-                    throw new Error(result.error || 'Transcription failed');
+                    throw new Error(result.error || 'Transcription failed - no text detected');
                 }
 
             } catch (error) {
@@ -496,126 +532,23 @@
             }
         }
 
-        // Live speech recognition (works without backend)
-        function startLiveSpeech() {
-            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                showStatus('❌ Speech recognition not supported in this browser. Try Chrome/Edge.', 'error');
-                return;
-            }
-
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            speechRecognition = new SpeechRecognition();
-            
-            speechRecognition.continuous = true;
-            speechRecognition.interimResults = true;
-            speechRecognition.lang = 'en-US';
-            
-            let finalTranscript = '';
-            
-            speechRecognition.onstart = () => {
-                isLiveSpeech = true;
-                document.getElementById('liveBtn').disabled = true;
-                document.getElementById('startBtn').disabled = true;
-                document.getElementById('recordingIndicator').style.display = 'block';
-                document.getElementById('recordingIndicator').innerHTML = '🗣️ Live Speech Recognition... Say "stop" to finish!';
-                showStatus('🗣️ Live speech recognition started! Speak clearly.', 'success');
-            };
-            
-            speechRecognition.onresult = (event) => {
-                let interimTranscript = '';
-                
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    const transcript = event.results[i][0].transcript;
-                    if (event.results[i].isFinal) {
-                        finalTranscript += transcript + ' ';
-                    } else {
-                        interimTranscript += transcript;
-                    }
-                }
-                
-                // Show live transcript
-                document.getElementById('transcriptText').textContent = finalTranscript + interimTranscript;
-                
-                // Auto-stop if user says "stop"
-                if ((finalTranscript + interimTranscript).toLowerCase().includes('stop')) {
-                    stopLiveSpeech();
-                }
-            };
-            
-            speechRecognition.onend = () => {
-                if (isLiveSpeech) {
-                    // Process the final transcript
-                    if (finalTranscript.trim()) {
-                        processTranscript(finalTranscript.trim());
-                    } else {
-                        showStatus('⚠️ No speech detected. Please try again.', 'warning');
-                    }
-                    stopLiveSpeech();
-                }
-            };
-            
-            speechRecognition.onerror = (event) => {
-                console.error('Speech recognition error:', event.error);
-                showStatus(`❌ Speech recognition error: ${event.error}`, 'error');
-                stopLiveSpeech();
-            };
-            
-            speechRecognition.start();
-        }
-
-        function stopLiveSpeech() {
-            if (speechRecognition && isLiveSpeech) {
-                speechRecognition.stop();
-                isLiveSpeech = false;
-                document.getElementById('liveBtn').disabled = false;
-                document.getElementById('startBtn').disabled = false;
-                document.getElementById('recordingIndicator').style.display = 'none';
-            }
-        }
-
-        // Process transcript directly (bypass audio processing)
-        async function processTranscript(transcript) {
-            document.getElementById('processingIndicator').style.display = 'block';
-            showStatus('🔄 Analyzing your speech with AI...', 'warning');
-
-            try {
-                if (!lmStudioConnected) {
-                    await testConnection();
-                }
-
-                let analysis;
-                if (lmStudioConnected) {
-                    analysis = await getAIFeedback(transcript);
-                } else {
-                    analysis = analyzeBasicGrammar(transcript);
-                    showStatus('⚠️ Using basic analysis. Connect LM Studio for AI-powered feedback.', 'warning');
-                }
-
-                displayResults(transcript, analysis);
-
-            } catch (error) {
-                console.error('Error processing transcript:', error);
-                showStatus('❌ Error analyzing speech. Please try again.', 'error');
-            } finally {
-                document.getElementById('processingIndicator').style.display = 'none';
-            }
-        }
-
+        // 3. Use dynamic model name in AI requests
         async function getAIFeedback(transcript) {
             try {
+                const modelName = window.currentModel || "llama-3.2-3b-instruct"; // Fallback
+                
                 const prompt = `You are an English language teacher helping a student improve their speaking skills. 
+        Please analyze this transcript and provide helpful feedback:
+        "${transcript}"
 
-Please analyze this transcript and provide helpful feedback:
-"${transcript}"
+        Focus on:
+        1. Grammar mistakes and corrections
+        2. Word choice improvements  
+        3. Sentence structure suggestions
+        4. Pronunciation tips (if obvious from text)
+        5. Overall communication effectiveness
 
-Focus on:
-1. Grammar mistakes and corrections
-2. Word choice improvements
-3. Sentence structure suggestions
-4. Pronunciation tips (if obvious from text)
-5. Overall communication effectiveness
-
-Be encouraging but specific about improvements. Format your response clearly with numbered points.`;
+        Be encouraging but specific about improvements. Format your response clearly with numbered points.`;
 
                 const response = await fetch('http://localhost:1234/v1/chat/completions', {
                     method: 'POST',
@@ -623,14 +556,14 @@ Be encouraging but specific about improvements. Format your response clearly wit
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        model: "llama-3.2-3b-instruct",
+                        model: modelName, // Use detected model
                         messages: [
                             {
                                 role: "system",
-                                content: "You are a helpful English language teacher providing constructive feedback on student speech."
+                                content: "You are a helpful and expert English language teacher."
                             },
                             {
-                                role: "user",
+                                role: "user", 
                                 content: prompt
                             }
                         ],
@@ -640,7 +573,7 @@ Be encouraging but specific about improvements. Format your response clearly wit
                 });
 
                 if (!response.ok) {
-                    throw new Error('LM Studio request failed');
+                    throw new Error(`LM Studio request failed: ${response.status}`);
                 }
 
                 const data = await response.json();
@@ -648,35 +581,44 @@ Be encouraging but specific about improvements. Format your response clearly wit
 
             } catch (error) {
                 console.error('LM Studio error:', error);
+                lmStudioConnected = false; // Reset connection status
+                updateConnectionStatus(false);
+                showStatus(`❌ AI analysis failed: ${error.message}. Using basic analysis.`, 'error');
                 return analyzeBasicGrammar(transcript);
             }
         }
 
         function analyzeBasicGrammar(transcript) {
             // Fallback analysis when LM Studio isn't available
+            // This is a simple, rule-based approach.
             const mistakes = [
-                { wrong: "I enjoys", correct: "I enjoy" },
-                { wrong: "it help me", correct: "it helps me" },
-                { wrong: "I wakes up", correct: "I wake up" },
-                { wrong: "before go to", correct: "before going to" },
-                { wrong: "have many", correct: "has many" },
-                { wrong: "I can creates", correct: "I can create" }
+                { wrong: "have completed", correct: "completed" },
+                { wrong: "in Coimbatore KIT College", correct: "at KIT College in Coimbatore" },
+                { wrong: "in 2019 from January 1st", correct: "on January 1, 2019" },
+                { wrong: "a fresh air", correct: "a fresher" },
+                { wrong: "100 application development", correct: "Android application development" },
+                { wrong: "under 6 months course", correct: "a six-month course" },
+                { wrong: "we started in my company they changed their language", correct: "my company changed its primary language" },
+                { wrong: "Python Floss", correct: "Python Flask" },
+                { wrong: "landed in", correct: "transitioned to" },
+                { wrong: "I promoted to", correct: "I was promoted to" },
+                { wrong: "had 4 team members", correct: "had a team of 4 members" }
             ];
 
-            let feedback = "Here's some basic feedback:\n\n";
+            let feedback = "### Basic Grammar Feedback:\n\n";
             let foundMistakes = 0;
 
             mistakes.forEach(mistake => {
                 if (transcript.includes(mistake.wrong)) {
                     foundMistakes++;
-                    feedback += `${foundMistakes}. Grammar: "${mistake.wrong}" should be "${mistake.correct}"\n`;
+                    feedback += `${foundMistakes}. **Correction:** "${mistake.wrong}" should be "${mistake.correct}".\n`;
                 }
             });
 
             if (foundMistakes === 0) {
-                feedback = "Great job! I didn't detect any obvious grammar mistakes. Keep practicing to improve fluency and confidence!";
+                feedback = "Great job! I didn't detect any of these common grammar mistakes. Keep practicing!";
             } else {
-                feedback += `\nOverall: ${foundMistakes} grammar points to work on. Keep practicing!`;
+                feedback += `\n**Keep up the great work!** Focusing on these ${foundMistakes} points will make your English even more fluent.`;
             }
 
             return feedback;
@@ -700,7 +642,6 @@ Be encouraging but specific about improvements. Format your response clearly wit
                 utterance.pitch = 1;
                 utterance.volume = 1;
                 
-                // Try to use a clear English voice
                 const voices = speechSynthesis.getVoices();
                 const englishVoice = voices.find(voice => 
                     voice.lang.includes('en') && 
@@ -718,7 +659,7 @@ Be encouraging but specific about improvements. Format your response clearly wit
         function startNewPractice() {
             document.getElementById('feedbackSection').style.display = 'none';
             getNewPrompt();
-            showStatus('Ready for new practice session!', 'success');
+            showStatus('Ready for a new practice session!', 'success');
         }
 
         function showStatus(message, type) {
@@ -727,7 +668,6 @@ Be encouraging but specific about improvements. Format your response clearly wit
             status.className = `status ${type}`;
         }
 
-        // Load voices and test connection when page loads
         window.addEventListener('load', () => {
             if ('speechSynthesis' in window) {
                 speechSynthesis.getVoices();
@@ -736,7 +676,6 @@ Be encouraging but specific about improvements. Format your response clearly wit
                 });
             }
             
-            // Auto-test connection after a short delay
             setTimeout(testConnection, 1000);
         });
     </script>
