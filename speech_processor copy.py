@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Backend server for English Practice App
-Flask backend with Whisper transcription and IMPROVED mistake detection
+Flask backend with Whisper transcription using external configuration
 """
 
 from flask import Flask, request, jsonify, render_template
@@ -16,15 +16,12 @@ from datetime import datetime
 from pydub import AudioSegment
 from werkzeug.utils import secure_filename
 import requests
-import re
-import language_tool_python
 
 # Import configuration
 from config import config, PRACTICE_PROMPTS, GRAMMAR_CORRECTIONS, AI_FEEDBACK_PROMPT, AI_SYSTEM_MESSAGE
 
 # Global variables
 model = None
-grammar_tool = None
 
 def create_app(config_name=None):
     """Application factory pattern"""
@@ -52,17 +49,6 @@ def create_app(config_name=None):
         print(f"Loading Whisper model: {app.config['WHISPER_MODEL']}...")
         model = whisper.load_model(app.config['WHISPER_MODEL'])
         print("Whisper model loaded successfully!")
-    
-    # Load Grammar Tool
-    global grammar_tool
-    if grammar_tool is None:
-        try:
-            print("Loading LanguageTool for grammar checking...")
-            grammar_tool = language_tool_python.LanguageTool('en-US')
-            print("LanguageTool loaded successfully!")
-        except Exception as e:
-            print(f"Warning: Could not load LanguageTool: {e}")
-            grammar_tool = None
     
     # Helper functions
     def allowed_file(filename):
@@ -102,188 +88,22 @@ def create_app(config_name=None):
         except Exception as e:
             print(f"Normalization warning: {e}")
 
-    def check_sentence_structure(transcript):
-        """Check for basic sentence structure issues"""
-        issues = []
-        sentences = re.split(r'[.!?]+', transcript)
-        
-        for i, sentence in enumerate(sentences):
-            sentence = sentence.strip()
-            if not sentence:
-                continue
-            
-            # Check if sentence starts with capital letter
-            if sentence and not sentence[0].isupper():
-                issues.append({
-                    'type': 'capitalization',
-                    'message': f'Sentence should start with capital letter: "{sentence[:30]}..."'
-                })
-            
-            # Check for very short sentences (might be incomplete)
-            if len(sentence.split()) < 3:
-                issues.append({
-                    'type': 'incomplete',
-                    'message': f'This might be an incomplete sentence: "{sentence}"'
-                })
-        
-        return issues
-
-    def check_common_mistakes(transcript):
-        """Check for common speaking/pronunciation mistakes"""
-        issues = []
-        
-        # Common pronunciation errors that affect transcription
-        common_errors = [
-            # Original mistakes from GRAMMAR_CORRECTIONS
-            {'wrong': 'I goed', 'correct': 'I went', 'explanation': 'Past tense of "go" is "went"'},
-            {'wrong': 'He don\'t', 'correct': 'He doesn\'t', 'explanation': 'Use "doesn\'t" with he/she/it'},
-            {'wrong': 'She don\'t', 'correct': 'She doesn\'t', 'explanation': 'Use "doesn\'t" with he/she/it'},
-            {'wrong': 'I seen', 'correct': 'I saw', 'explanation': 'Past tense of "see" is "saw"'},
-            {'wrong': 'He have', 'correct': 'He has', 'explanation': 'Use "has" with he/she/it'},
-            
-            # New additions for better detection
-            {'wrong': 'I is', 'correct': 'I am', 'explanation': 'Use "am" with "I"'},
-            {'wrong': 'you is', 'correct': 'you are', 'explanation': 'Use "are" with "you"'},
-            {'wrong': 'they is', 'correct': 'they are', 'explanation': 'Use "are" with "they"'},
-            {'wrong': 'was went', 'correct': 'went', 'explanation': 'Don\'t use "was" before "went"'},
-            {'wrong': 'did went', 'correct': 'went', 'explanation': 'Don\'t use "did" before "went"'},
-            {'wrong': 'more better', 'correct': 'better', 'explanation': 'Don\'t use "more" with "better"'},
-            {'wrong': 'more good', 'correct': 'better', 'explanation': 'Use "better" not "more good"'},
-            {'wrong': 'gooder', 'correct': 'better', 'explanation': 'Use "better" not "gooder"'},
-            {'wrong': 'alot', 'correct': 'a lot', 'explanation': '"A lot" is two words'},
-            {'wrong': 'gonna', 'correct': 'going to', 'explanation': 'Use "going to" in formal speech'},
-            {'wrong': 'wanna', 'correct': 'want to', 'explanation': 'Use "want to" in formal speech'},
-            {'wrong': 'gotta', 'correct': 'have to', 'explanation': 'Use "have to" in formal speech'},
-        ]
-        
-        transcript_lower = transcript.lower()
-        
-        for error in common_errors:
-            if error['wrong'].lower() in transcript_lower:
-                issues.append({
-                    'type': 'grammar',
-                    'wrong': error['wrong'],
-                    'correct': error['correct'],
-                    'explanation': error['explanation']
-                })
-        
-        return issues
-
-    def check_article_usage(transcript):
-        """Check for missing or incorrect articles (a, an, the)"""
-        issues = []
-        
-        # Words that need articles before them
-        patterns = [
-            (r'\b(is|was|have|has)\s+(good|bad|important|interesting)\s+', 
-             'Missing article: Should be "a good/bad/important/interesting"'),
-            (r'\bI\s+am\s+student\b', 'Missing article: Should be "I am a student"'),
-            (r'\bI\s+am\s+teacher\b', 'Missing article: Should be "I am a teacher"'),
-            (r'\bThis\s+is\s+book\b', 'Missing article: Should be "This is a book"'),
-        ]
-        
-        for pattern, message in patterns:
-            if re.search(pattern, transcript, re.IGNORECASE):
-                issues.append({
-                    'type': 'article',
-                    'message': message
-                })
-        
-        return issues
-
-    def check_with_languagetool(transcript):
-        """Use LanguageTool for advanced grammar checking"""
-        if grammar_tool is None:
-            return []
-        
-        try:
-            matches = grammar_tool.check(transcript)
-            issues = []
-            
-            for match in matches[:10]:  # Limit to 10 issues
-                issues.append({
-                    'type': 'languagetool',
-                    'message': match.message,
-                    'context': match.context,
-                    'replacements': match.replacements[:3] if match.replacements else []
-                })
-            
-            return issues
-        except Exception as e:
-            print(f"LanguageTool error: {e}")
-            return []
-
-    def analyze_improved_grammar(transcript):
-        """IMPROVED grammar analysis with multiple checks"""
-        feedback = "### 🎯 AI Feedback - Detailed Analysis:\n\n"
-        
-        all_issues = []
-        
-        # 1. Check common mistakes
-        common_issues = check_common_mistakes(transcript)
-        all_issues.extend(common_issues)
-        
-        # 2. Check sentence structure
-        structure_issues = check_sentence_structure(transcript)
-        all_issues.extend(structure_issues)
-        
-        # 3. Check article usage
-        article_issues = check_article_usage(transcript)
-        all_issues.extend(article_issues)
-        
-        # 4. Use LanguageTool for advanced checking
-        languagetool_issues = check_with_languagetool(transcript)
-        all_issues.extend(languagetool_issues)
-        
-        if not all_issues:
-            feedback += "✅ **Excellent work!** I didn't find any major grammar mistakes.\n\n"
-            feedback += "**Your strengths:**\n"
-            feedback += "- Clear sentence structure\n"
-            feedback += "- Good grammar usage\n"
-            feedback += "- Proper word choices\n\n"
-            feedback += "💡 **Keep practicing to maintain your skills!**"
-        else:
-            feedback += f"**Found {len(all_issues)} areas for improvement:**\n\n"
-            
-            # Grammar issues
-            grammar_issues = [i for i in all_issues if i.get('type') == 'grammar']
-            if grammar_issues:
-                feedback += "**📝 Grammar Corrections:**\n"
-                for i, issue in enumerate(grammar_issues, 1):
-                    feedback += f"{i}. ❌ **\"{issue['wrong']}\"** → ✅ **\"{issue['correct']}\"**\n"
-                    feedback += f"   💡 {issue['explanation']}\n\n"
-            
-            # Sentence structure issues
-            structure_issues_list = [i for i in all_issues if i.get('type') in ['capitalization', 'incomplete']]
-            if structure_issues_list:
-                feedback += "**🏗️ Sentence Structure:**\n"
-                for i, issue in enumerate(structure_issues_list, 1):
-                    feedback += f"{i}. {issue['message']}\n\n"
-            
-            # Article issues
-            article_issues_list = [i for i in all_issues if i.get('type') == 'article']
-            if article_issues_list:
-                feedback += "**📰 Article Usage (a, an, the):**\n"
-                for i, issue in enumerate(article_issues_list, 1):
-                    feedback += f"{i}. {issue['message']}\n\n"
-            
-            # LanguageTool issues
-            lt_issues = [i for i in all_issues if i.get('type') == 'languagetool']
-            if lt_issues:
-                feedback += "**🔍 Advanced Grammar Check:**\n"
-                for i, issue in enumerate(lt_issues[:5], 1):  # Show top 5
-                    feedback += f"{i}. {issue['message']}\n"
-                    if issue['replacements']:
-                        feedback += f"   Suggestions: {', '.join(issue['replacements'])}\n\n"
-            
-            feedback += "\n---\n"
-            feedback += "**💪 Keep up the great work!** Practice these corrections to improve your English!"
-        
-        return feedback
-
     def analyze_basic_grammar(transcript):
-        """Fallback - calls improved version"""
-        return analyze_improved_grammar(transcript)
+        """Fallback grammar analysis when LM Studio isn't available"""
+        feedback = "### Basic Grammar Feedback:\n\n"
+        found_mistakes = 0
+
+        for mistake in GRAMMAR_CORRECTIONS:
+            if mistake['wrong'] in transcript:
+                found_mistakes += 1
+                feedback += f"{found_mistakes}. **Correction:** \"{mistake['wrong']}\" should be \"{mistake['correct']}\".\n"
+
+        if found_mistakes == 0:
+            feedback = "Great job! I didn't detect any of these common grammar mistakes. Keep practicing!"
+        else:
+            feedback += f"\n**Keep up the great work!** Focusing on these {found_mistakes} points will make your English even more fluent."
+
+        return feedback
 
     # Routes
     @app.route('/')
@@ -295,7 +115,6 @@ def create_app(config_name=None):
         return jsonify({
             'status': 'healthy',
             'whisper_model': app.config['WHISPER_MODEL'],
-            'grammar_tool_loaded': grammar_tool is not None,
             'static_folder': app.static_folder,
             'audio_folder': app.config['AUDIO_FOLDER'],
             'folder_exists': os.path.exists(app.config['AUDIO_FOLDER']),
@@ -400,7 +219,7 @@ def create_app(config_name=None):
 
     @app.route('/analyze', methods=['POST'])
     def analyze_speech():
-        """Analyze speech with LM Studio or IMPROVED fallback analysis"""
+        """Analyze speech with LM Studio or fallback to basic analysis"""
         try:
             data = request.get_json()
             if not data or 'transcript' not in data:
@@ -438,11 +257,11 @@ def create_app(config_name=None):
                     raise requests.RequestException("LM Studio request failed")
 
             except requests.RequestException:
-                # Fallback to IMPROVED analysis
-                improved_feedback = analyze_improved_grammar(transcript)
+                # Fallback to basic analysis
+                basic_feedback = analyze_basic_grammar(transcript)
                 return jsonify({
-                    'feedback': improved_feedback,
-                    'source': 'improved',
+                    'feedback': basic_feedback,
+                    'source': 'basic',
                     'success': True
                 })
 
@@ -463,7 +282,6 @@ if __name__ == '__main__':
     print(f"Environment: {os.getenv('FLASK_ENV', 'development')}")
     print(f"Whisper model: {app.config['WHISPER_MODEL']}")
     print(f"Audio storage: {app.config['AUDIO_FOLDER']}")
-    print(f"Grammar Tool: {'Loaded' if grammar_tool else 'Not available'}")
     print(f"Server running on http://{app.config['HOST']}:{app.config['PORT']}")
     print("\nEndpoints:")
     print("   GET  /             - Main application")
@@ -471,7 +289,7 @@ if __name__ == '__main__':
     print("   GET  /models       - Get LM Studio models")
     print("   GET  /prompts      - Get random prompt")
     print("   POST /transcribe   - Process audio file")
-    print("   POST /analyze      - Analyze transcript (IMPROVED)")
+    print("   POST /analyze      - Analyze transcript")
     
     app.run(
         host=app.config['HOST'], 
